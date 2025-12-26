@@ -13,6 +13,7 @@ library flutter_pwa_install;
 
 // Core PWA Installation
 export 'src/flutter_pwa_install_base.dart';
+export 'src/browser_detector.dart';
 export 'src/models/browser_capabilities.dart';
 export 'src/models/install_result.dart';
 export 'src/models/installability_checks.dart';

@@ -1,7 +1,6 @@
-import 'dart:async';
 import 'dart:html' as html;
+import 'dart:js_interop';
 import 'package:flutter/material.dart';
-import 'package:web/web.dart' as web;
 
 import 'enums/browser.dart';
 import 'enums/display_mode.dart';
@@ -10,6 +9,77 @@ import 'enums/platform.dart';
 import 'models/browser_capabilities.dart';
 import 'models/install_result.dart';
 
+// =============================================================================
+// BeforeInstallPromptEvent JS Interop (Non-Standard Chrome API)
+// =============================================================================
+//
+// WHY dart:html + dart:js_interop (not package:web):
+//
+// 1. BeforeInstallPromptEvent is a NON-STANDARD API only in Chromium browsers
+//    - Not part of official Web IDL specs
+//    - package:web is generated from Web IDL, so it doesn't include this
+//
+// 2. dart:html provides stable DOM access (window, navigator, document)
+//    - Well-tested in Flutter web projects
+//    - Simpler API for common operations (addEventListener, localStorage)
+//
+// 3. dart:js_interop handles the custom PWA prompt event
+//    - Extension types for type-safe JS interop
+//    - Future-compatible (replaces deprecated dart:js_util)
+//
+// MIGRATION NOTE: When package:web adds BeforeInstallPromptEvent support,
+// this file can be migrated. Track: https://github.com/nickmeinhold/pwa_install
+// =============================================================================
+
+/// Extension type for the userChoice result
+extension type _UserChoiceResult._(JSObject _) implements JSObject {
+  external String get outcome;
+  external String? get platform;
+}
+
+/// Extension type for BeforeInstallPromptEvent (Chromium-only)
+extension type _BeforeInstallPromptEventJS._(JSObject _) implements JSObject {
+  external void prompt();
+  external JSPromise<_UserChoiceResult> get userChoice;
+}
+
+/// Dart wrapper for BeforeInstallPromptEvent with proper Future handling
+class BeforeInstallPromptEvent {
+  BeforeInstallPromptEvent._(this._jsEvent);
+
+  final _BeforeInstallPromptEventJS _jsEvent;
+
+  /// Create from a raw html.Event (cast to JS interop type)
+  factory BeforeInstallPromptEvent.fromEvent(html.Event event) {
+    // Cast the dart:html Event to our JS interop extension type
+    final jsObject = (event as dynamic) as JSObject;
+    return BeforeInstallPromptEvent._(_BeforeInstallPromptEventJS._(jsObject));
+  }
+
+  /// Shows the install prompt to the user
+  void prompt() => _jsEvent.prompt();
+
+  /// Returns a Future that resolves with the user's choice
+  Future<InstallPromptResult> getUserChoice() async {
+    final result = await _jsEvent.userChoice.toDart;
+    return InstallPromptResult(
+      outcome: result.outcome,
+      platform: result.platform,
+    );
+  }
+}
+
+/// Result from the user's install prompt interaction
+class InstallPromptResult {
+  const InstallPromptResult({required this.outcome, this.platform});
+
+  /// 'accepted' if user installed, 'dismissed' if user cancelled
+  final String outcome;
+
+  /// The platform chosen (e.g., 'web' for browser install)
+  final String? platform;
+}
+
 /// Detects browser, platform, and handles install prompts
 class BrowserDetector {
   BrowserDetector({this.debug = false}) {
@@ -17,13 +87,13 @@ class BrowserDetector {
   }
 
   final bool debug;
-  web.BeforeInstallPromptEvent? _deferredPrompt;
+  BeforeInstallPromptEvent? _deferredPrompt;
 
   void _setupEventListeners() {
     // Listen for beforeinstallprompt event
     html.window.addEventListener('beforeinstallprompt', (event) {
       event.preventDefault();
-      _deferredPrompt = event as web.BeforeInstallPromptEvent;
+      _deferredPrompt = BeforeInstallPromptEvent.fromEvent(event);
       if (debug) {
         debugPrint('[BrowserDetector] beforeinstallprompt event captured');
       }
@@ -199,7 +269,7 @@ class BrowserDetector {
       _deferredPrompt!.prompt();
 
       // Wait for user choice
-      final choiceResult = await _deferredPrompt!.userChoice;
+      final choiceResult = await _deferredPrompt!.getUserChoice();
 
       // Clear the deferred prompt
       _deferredPrompt = null;
@@ -229,14 +299,13 @@ class BrowserDetector {
   }
 
   /// Show iOS installation instructions dialog
+  ///
+  /// Note: This method returns a placeholder result. The actual iOS install
+  /// instructions dialog should be shown by the Flutter app using the
+  /// IOSInstallDialog widget.
   Future<InstallResult> showIOSInstructions({String? customText}) async {
-    final completer = Completer<InstallResult>();
-
-    // This will be called from the Flutter widget
-    // We need to use a global BuildContext or Navigator key
-    // For now, we'll return a result that indicates iOS instructions should be shown
-    // The actual dialog will be shown by the Flutter app
-
+    // iOS requires manual "Add to Home Screen" from the share menu
+    // The Flutter app should show IOSInstallDialog to guide users
     return InstallResult(
       outcome: InstallOutcome.dismissed,
       timestamp: DateTime.now(),
