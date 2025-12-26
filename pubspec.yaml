@@ -1,0 +1,28 @@
+name: flutter_pwa_install
+description: Modern PWA installation package for Flutter web apps with iOS support, manifest validation, and smart install prompts
+version: 1.0.0
+homepage: https://github.com/yourusername/flutter_pwa_install
+repository: https://github.com/yourusername/flutter_pwa_install
+issue_tracker: https://github.com/yourusername/flutter_pwa_install/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  web: ^0.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  # This package is a pure Dart package (no platform plugins)
+  plugin:
+    platforms:
+      web:
+        pluginClass: FlutterPwaInstallWeb
+        fileName: flutter_pwa_install_web.dart
