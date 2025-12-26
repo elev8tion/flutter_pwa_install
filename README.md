@@ -7,6 +7,7 @@ Modern PWA installation package for Flutter web apps with iOS support, manifest 
 
 ## Features
 
+### Core PWA Installation
 ✅ **Universal Browser Support** - Chrome, Edge, Safari (iOS & macOS), Samsung Internet, Opera
 ✅ **iOS Support** - Beautiful Material dialog with Add to Home Screen instructions
 ✅ **Manifest Validation** - Built-in checks for PWA installability requirements
@@ -14,7 +15,17 @@ Modern PWA installation package for Flutter web apps with iOS support, manifest 
 ✅ **Visit Tracking** - Track user visits to show prompt at the right time
 ✅ **Analytics Ready** - Event callbacks for install funnel tracking
 ✅ **Type Safe** - Full Dart type safety with null safety support
-✅ **Zero Dependencies** - Pure Dart/Flutter implementation
+✅ **Minimal Dependencies** - Only requires Flutter SDK + web package
+
+### Optional Responsive Design Features
+✅ **Breakpoint System** - Define custom screen size breakpoints for adaptive layouts
+✅ **Conditional Values** - Different values based on active breakpoint
+✅ **Max Width Container** - Limit content width on large screens with gutters
+✅ **Responsive Visibility** - Show/hide widgets based on screen size
+✅ **Landscape Support** - Different breakpoints for landscape orientation
+✅ **Platform Aware** - Built-in platform detection (iOS, Android, Web, etc.)
+
+📖 **[See Responsive Design Documentation →](RESPONSIVE_FEATURE.md)**
 
 ## Installation
 
