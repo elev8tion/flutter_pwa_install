@@ -1,84 +1,24 @@
-import 'dart:html' as html;
 import 'dart:js_interop';
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 
 import 'enums/browser.dart';
 import 'enums/display_mode.dart';
 import 'enums/install_method.dart';
 import 'enums/platform.dart';
+import 'js_interop_extensions.dart';
 import 'models/browser_capabilities.dart';
 import 'models/install_result.dart';
 
 // =============================================================================
-// BeforeInstallPromptEvent JS Interop (Non-Standard Chrome API)
+// Browser Detection and PWA Installation Handler
 // =============================================================================
 //
-// WHY dart:html + dart:js_interop (not package:web):
+// Uses package:web for standard Web APIs and dart:js_interop for non-standard
+// browser APIs (BeforeInstallPromptEvent, navigator.standalone).
 //
-// 1. BeforeInstallPromptEvent is a NON-STANDARD API only in Chromium browsers
-//    - Not part of official Web IDL specs
-//    - package:web is generated from Web IDL, so it doesn't include this
-//
-// 2. dart:html provides stable DOM access (window, navigator, document)
-//    - Well-tested in Flutter web projects
-//    - Simpler API for common operations (addEventListener, localStorage)
-//
-// 3. dart:js_interop handles the custom PWA prompt event
-//    - Extension types for type-safe JS interop
-//    - Future-compatible (replaces deprecated dart:js_util)
-//
-// MIGRATION NOTE: When package:web adds BeforeInstallPromptEvent support,
-// this file can be migrated. Track: https://github.com/nickmeinhold/pwa_install
+// See: MIGRATION_TO_PACKAGE_WEB.md for migration details
 // =============================================================================
-
-/// Extension type for the userChoice result
-extension type _UserChoiceResult._(JSObject _) implements JSObject {
-  external String get outcome;
-  external String? get platform;
-}
-
-/// Extension type for BeforeInstallPromptEvent (Chromium-only)
-extension type _BeforeInstallPromptEventJS._(JSObject _) implements JSObject {
-  external void prompt();
-  external JSPromise<_UserChoiceResult> get userChoice;
-}
-
-/// Dart wrapper for BeforeInstallPromptEvent with proper Future handling
-class BeforeInstallPromptEvent {
-  BeforeInstallPromptEvent._(this._jsEvent);
-
-  final _BeforeInstallPromptEventJS _jsEvent;
-
-  /// Create from a raw html.Event (cast to JS interop type)
-  factory BeforeInstallPromptEvent.fromEvent(html.Event event) {
-    // Cast the dart:html Event to our JS interop extension type
-    final jsObject = (event as dynamic) as JSObject;
-    return BeforeInstallPromptEvent._(_BeforeInstallPromptEventJS._(jsObject));
-  }
-
-  /// Shows the install prompt to the user
-  void prompt() => _jsEvent.prompt();
-
-  /// Returns a Future that resolves with the user's choice
-  Future<InstallPromptResult> getUserChoice() async {
-    final result = await _jsEvent.userChoice.toDart;
-    return InstallPromptResult(
-      outcome: result.outcome,
-      platform: result.platform,
-    );
-  }
-}
-
-/// Result from the user's install prompt interaction
-class InstallPromptResult {
-  const InstallPromptResult({required this.outcome, this.platform});
-
-  /// 'accepted' if user installed, 'dismissed' if user cancelled
-  final String outcome;
-
-  /// The platform chosen (e.g., 'web' for browser install)
-  final String? platform;
-}
 
 /// Detects browser, platform, and handles install prompts
 class BrowserDetector {
@@ -90,26 +30,32 @@ class BrowserDetector {
   BeforeInstallPromptEvent? _deferredPrompt;
 
   void _setupEventListeners() {
-    // Listen for beforeinstallprompt event
-    html.window.addEventListener('beforeinstallprompt', (event) {
-      event.preventDefault();
-      _deferredPrompt = BeforeInstallPromptEvent.fromEvent(event);
-      if (debug) {
-        debugPrint('[BrowserDetector] beforeinstallprompt event captured');
-      }
-    });
+    // Listen for beforeinstallprompt event (Chromium-only)
+    web.window.addEventListener(
+      'beforeinstallprompt',
+      ((web.Event event) {
+        event.preventDefault();
+        _deferredPrompt = BeforeInstallPromptEvent.fromEvent(event);
+        if (debug) {
+          debugPrint('[BrowserDetector] beforeinstallprompt event captured');
+        }
+      }).toJS,
+    );
 
     // Listen for appinstalled event
-    html.window.addEventListener('appinstalled', (event) {
-      if (debug) {
-        debugPrint('[BrowserDetector] App installed');
-      }
-    });
+    web.window.addEventListener(
+      'appinstalled',
+      ((web.Event event) {
+        if (debug) {
+          debugPrint('[BrowserDetector] App installed');
+        }
+      }).toJS,
+    );
   }
 
   /// Detect the current platform
   DevicePlatform detectPlatform() {
-    final ua = html.window.navigator.userAgent.toLowerCase();
+    final ua = web.window.navigator.userAgent.toLowerCase();
 
     if (RegExp(r'iphone|ipad|ipod').hasMatch(ua)) {
       return DevicePlatform.ios;
@@ -132,7 +78,7 @@ class BrowserDetector {
 
   /// Detect the current browser
   BrowserType detectBrowser() {
-    final ua = html.window.navigator.userAgent.toLowerCase();
+    final ua = web.window.navigator.userAgent.toLowerCase();
 
     // Order matters - check Edge before Chrome
     if (RegExp(r'edg').hasMatch(ua)) {
@@ -159,25 +105,28 @@ class BrowserDetector {
 
   /// Detect current display mode
   DisplayMode detectDisplayMode() {
-    // Check for iOS standalone mode
-    final nav = html.window.navigator as dynamic;
-    if (nav.standalone == true) {
-      return DisplayMode.standalone;
+    // Safari-only: Check navigator.standalone (iOS/macOS Safari specific property)
+    // This property ONLY exists in Safari - accessing it in other browsers throws an error
+    if (detectBrowser() == BrowserType.safari) {
+      final standaloneValue = getStandaloneValue();
+      if (standaloneValue == true) {
+        return DisplayMode.standalone;
+      }
     }
 
-    // Check display-mode media queries
-    if (html.window.matchMedia('(display-mode: standalone)').matches) {
+    // All browsers: Check display-mode media queries (standard, works everywhere)
+    if (web.window.matchMedia('(display-mode: standalone)').matches) {
       return DisplayMode.standalone;
     }
-    if (html.window.matchMedia('(display-mode: fullscreen)').matches) {
+    if (web.window.matchMedia('(display-mode: fullscreen)').matches) {
       return DisplayMode.fullscreen;
     }
-    if (html.window.matchMedia('(display-mode: minimal-ui)').matches) {
+    if (web.window.matchMedia('(display-mode: minimal-ui)').matches) {
       return DisplayMode.minimalUi;
     }
 
     // Check for TWA (Trusted Web Activity) on Android
-    if (html.document.referrer.startsWith('android-app://')) {
+    if (web.document.referrer.startsWith('android-app://')) {
       return DisplayMode.standalone;
     }
 
@@ -197,7 +146,15 @@ class BrowserDetector {
 
   /// Check if Service Workers are supported
   bool supportsServiceWorker() {
-    return html.window.navigator.serviceWorker != null;
+    // In package:web, serviceWorker is always available on modern browsers
+    // The property exists if the browser supports Service Workers
+    try {
+      // Access the serviceWorker to confirm it's available
+      web.window.navigator.serviceWorker;
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Check if Web App Manifest is supported
@@ -251,7 +208,7 @@ class BrowserDetector {
 
   /// Check if in secure context (HTTPS or localhost)
   bool isSecureContext() {
-    return html.window.isSecureContext ?? false;
+    return web.window.isSecureContext;
   }
 
   /// Show native browser install prompt (Chrome/Edge/Samsung)

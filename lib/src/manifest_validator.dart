@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web;
 
 import 'models/installability_checks.dart';
 
@@ -13,7 +14,8 @@ class ManifestValidator {
   /// Fetch and parse the web app manifest
   Future<Map<String, dynamic>?> fetchManifest() async {
     try {
-      final manifestLink = html.document.querySelector('link[rel="manifest"]') as html.LinkElement?;
+      final manifestLink =
+          web.document.querySelector('link[rel="manifest"]') as web.HTMLLinkElement?;
 
       if (manifestLink == null || manifestLink.href.isEmpty) {
         if (debug) {
@@ -22,8 +24,18 @@ class ManifestValidator {
         return null;
       }
 
-      final response = await html.HttpRequest.getString(manifestLink.href);
-      return jsonDecode(response) as Map<String, dynamic>;
+      // Use fetch API instead of HttpRequest
+      final response = await web.window.fetch(manifestLink.href.toJS).toDart;
+      if (!response.ok) {
+        if (debug) {
+          debugPrint('[ManifestValidator] Failed to fetch manifest: ${response.status}');
+        }
+        return null;
+      }
+
+      final jsText = await response.text().toDart;
+      final text = jsText.toDart;
+      return jsonDecode(text) as Map<String, dynamic>;
     } catch (e) {
       if (debug) {
         debugPrint('[ManifestValidator] Failed to fetch manifest: $e');
@@ -34,13 +46,9 @@ class ManifestValidator {
 
   /// Check if Service Worker is registered
   Future<bool> hasServiceWorker() async {
-    final serviceWorker = html.window.navigator.serviceWorker;
-    if (serviceWorker == null) {
-      return false;
-    }
-
     try {
-      final registration = await serviceWorker.getRegistration();
+      final sw = web.window.navigator.serviceWorker;
+      final registration = await sw.getRegistration().toDart;
       return registration != null;
     } catch (e) {
       if (debug) {
@@ -74,9 +82,9 @@ class ManifestValidator {
     final warnings = <String>[];
 
     // Check HTTPS
-    final isHttps = html.window.location.protocol == 'https:' ||
-        html.window.location.hostname == 'localhost' ||
-        html.window.location.hostname == '127.0.0.1';
+    final isHttps = web.window.location.protocol == 'https:' ||
+        web.window.location.hostname == 'localhost' ||
+        web.window.location.hostname == '127.0.0.1';
 
     if (!isHttps) {
       errors.add('PWA requires HTTPS (or localhost for development)');

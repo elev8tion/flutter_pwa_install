@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web;
 
 /// Storage data model
 class PWAStorage {
@@ -74,7 +74,7 @@ class StorageManager {
   /// Get stored data
   PWAStorage getData() {
     try {
-      final stored = html.window.localStorage[_storageKey];
+      final stored = web.window.localStorage.getItem(_storageKey);
       if (stored != null) {
         final json = jsonDecode(stored) as Map<String, dynamic>;
         return PWAStorage.fromJson(json);
@@ -99,7 +99,7 @@ class StorageManager {
   void _saveData(PWAStorage data) {
     try {
       final json = jsonEncode(data.toJson());
-      html.window.localStorage[_storageKey] = json;
+      web.window.localStorage.setItem(_storageKey, json);
     } catch (e) {
       if (debug) {
         debugPrint('[StorageManager] Failed to save data: $e');
@@ -170,7 +170,7 @@ class StorageManager {
   /// Clear all stored data
   void clear() {
     try {
-      html.window.localStorage.remove(_storageKey);
+      web.window.localStorage.removeItem(_storageKey);
     } catch (e) {
       if (debug) {
         debugPrint('[StorageManager] Failed to clear data: $e');

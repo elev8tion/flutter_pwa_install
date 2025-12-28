@@ -13,11 +13,12 @@ dependencies:
   flutter:
     sdk: flutter
   collection: ^1.16.0
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
 
-# This is a pure Dart package using dart:html for web APIs
+# This is a Flutter package using package:web for web APIs
 # No flutter: section needed - not a plugin
