@@ -94,6 +94,15 @@ class ManifestValidator {
     final manifest = await fetchManifest();
     final hasManifest = manifest != null;
 
+    if (debug) {
+      debugPrint('[ManifestValidator] Manifest fetched: $hasManifest');
+      if (manifest != null) {
+        debugPrint('[ManifestValidator] Manifest contents: $manifest');
+        debugPrint('[ManifestValidator] Has name: ${manifest.containsKey('name')}');
+        debugPrint('[ManifestValidator] Has icons: ${manifest.containsKey('icons')}');
+      }
+    }
+
     if (!hasManifest) {
       errors.add(
         'No web app manifest found. Add <link rel="manifest" href="manifest.json"> to your index.html',

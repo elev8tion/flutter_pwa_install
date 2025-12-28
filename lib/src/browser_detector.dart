@@ -31,14 +31,14 @@ class BrowserDetector {
 
   void _setupEventListeners() {
     // Listen for beforeinstallprompt event (Chromium-only)
+    debugPrint('[BrowserDetector] Setting up beforeinstallprompt listener...');
     web.window.addEventListener(
       'beforeinstallprompt',
       ((web.Event event) {
+        debugPrint('[BrowserDetector] *** beforeinstallprompt EVENT FIRED! ***');
         event.preventDefault();
         _deferredPrompt = BeforeInstallPromptEvent.fromEvent(event);
-        if (debug) {
-          debugPrint('[BrowserDetector] beforeinstallprompt event captured');
-        }
+        debugPrint('[BrowserDetector] Deferred prompt captured successfully');
       }).toJS,
     );
 
@@ -213,11 +213,14 @@ class BrowserDetector {
 
   /// Show native browser install prompt (Chrome/Edge/Samsung)
   Future<InstallResult> showNativePrompt() async {
+    debugPrint('[BrowserDetector] showNativePrompt called, _deferredPrompt is ${_deferredPrompt == null ? "NULL" : "available"}');
     if (_deferredPrompt == null) {
+      debugPrint('[BrowserDetector] ERROR: beforeinstallprompt event was never captured by Chrome!');
+      debugPrint('[BrowserDetector] This usually means Chrome does not consider the app installable yet.');
       return InstallResult(
         outcome: InstallOutcome.unsupported,
         timestamp: DateTime.now(),
-        error: 'No deferred prompt available',
+        error: 'No deferred prompt available - Chrome did not fire beforeinstallprompt',
       );
     }
 
